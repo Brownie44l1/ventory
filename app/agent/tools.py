@@ -56,13 +56,14 @@ def log_sale(items: list[dict], shop_id: str, trader_id: str) -> str:
         ]
         return "\n".join(lines) + f"\nTotal: ₦{result['grand_total']:,.0f}"
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not log sale: {e}"
 
 
 # ── Tool 2: Restock ────────────────────────────────────────────────────────────
 
 @tool
-def restock(product_name: str, quantity: float, shop_id: str, cost: float = None) -> str:
+def restock(product_name: str, quantity: float, shop_id: str, trader_id: str, cost: float = None) -> str:
     """
     Add stock to a product. Call when the owner says they got more of something.
 
@@ -70,25 +71,17 @@ def restock(product_name: str, quantity: float, shop_id: str, cost: float = None
         product_name: name of the product
         quantity: how many units were added
         shop_id: UUID of the active shop
+        trader_id: UUID of the trader
         cost: optional — what it cost to restock (Naira)
     """
     async def _inner():
         async with AsyncSessionLocal() as db:
             return await queries.log_restock(
-                db, shop_id, product_name,
+                db, shop_id, trader_id, product_name,   # ← trader_id added
                 Decimal(str(quantity)),
                 Decimal(str(cost)) if cost is not None else None,
             )
-
-    try:
-        result = _run(_inner())
-        cost_str = f" (cost: ₦{cost:,.0f})" if cost else ""
-        return (
-            f"Restocked {result['quantity_added']} {result['product_name']}{cost_str}. "
-            f"New stock: {result['new_stock']} {result['unit']}(s)."
-        )
-    except Exception as e:
-        return f"Could not restock: {e}"
+    ...
 
 
 # ── Tool 3: Log expense ────────────────────────────────────────────────────────
@@ -114,6 +107,7 @@ def log_expense(description: str, amount: float, shop_id: str, trader_id: str) -
         _run(_inner())
         return f"Expense recorded: {description} — ₦{amount:,.0f}."
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not log expense: {e}"
 
 
@@ -140,6 +134,7 @@ def log_debt(counterparty: str, amount: float, shop_id: str, trader_id: str) -> 
         _run(_inner())
         return f"Debt recorded: {counterparty} owes ₦{amount:,.0f}."
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not log debt: {e}"
 
 
@@ -168,6 +163,7 @@ def settle_debt(counterparty: str, amount_paid: float, shop_id: str) -> str:
         balance = result["balance"]
         return f"Payment of ₦{amount_paid:,.0f} from {counterparty} recorded. Balance: ₦{balance:,.0f}."
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not settle debt: {e}"
 
 
@@ -193,6 +189,7 @@ def get_inventory(shop_id: str) -> str:
         ]
         return "\n".join(lines)
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not get inventory: {e}"
 
 
@@ -232,6 +229,7 @@ def get_insights(shop_id: str, period: str = "today") -> str:
             f"Low stock:\n{alerts}"
         )
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not get insights: {e}"
 
 
@@ -264,4 +262,5 @@ def add_product(
             f"at ₦{result.unit_price:,.0f} each."
         )
     except Exception as e:
+        logger.error("restock failed: %s", e, exc_info=True) 
         return f"Could not add product: {e}"

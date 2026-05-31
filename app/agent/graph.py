@@ -4,6 +4,7 @@ from langgraph.graph.state import CompiledStateGraph
 from app.agent.models import State
 from app.agent.nodes import (
     chitchat, clarify, classify, dispatch, route_classify, synthesize,
+    route_resolve_products,
     generate_sql, validate_sql, execute_sql, sql_synthesize,
     route_sql_validate, route_sql_execute,
 )
@@ -40,7 +41,10 @@ def build_graph() -> CompiledStateGraph:
 
     # Write path
     workflow.add_edge("list_products",    "resolve_products")
-    workflow.add_edge("resolve_products", "dispatch")
+    workflow.add_conditional_edges("resolve_products", route_resolve_products, {
+        "clarify":  "clarify",
+        "dispatch": "dispatch",
+    })
     workflow.add_edge("dispatch",         "synthesize")
     workflow.add_edge("synthesize",       END)
 

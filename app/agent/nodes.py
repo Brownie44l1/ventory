@@ -105,9 +105,20 @@ async def classify(state: State) -> dict:
 
 async def dispatch(state: State) -> dict:
     intent = state.intent
-    params = state.tool_params
+    params = dict(state.tool_params)  # copy so we can mutate
     shop_id   = state.shop_id
     trader_id = state.trader_id
+
+    # Substitute resolved product names into tool params
+    resolved = state.resolved_products
+    if resolved:
+        items = params.get("items")
+        if items:
+            for item in items:
+                raw = item["product_name"]
+                if raw in resolved:
+                    item["product_name"] = resolved[raw]
+
     logger.info("Dispatch: intent=%s params=%s", intent, params)
 
     try:
@@ -118,7 +129,7 @@ async def dispatch(state: State) -> dict:
                 "trader_id": trader_id,
             })
         elif intent == "restock":
-            result = restock.invoke({**params, "shop_id": shop_id})
+            result = restock.invoke({**params, "shop_id": shop_id, "trader_id": trader_id})
         elif intent == "log_expense":
             result = log_expense.invoke({**params, "shop_id": shop_id, "trader_id": trader_id})
         elif intent == "log_debt":
@@ -325,6 +336,13 @@ def route_classify(state: State) -> str:
     elif intent in _READ_INTENTS:
         return "generate_sql"
     return "dispatch_prep"  # write intents → list_products → resolve_products first
+
+
+def route_resolve_products(state: State) -> str:
+    """After resolving product names, go to clarify if any were unresolved."""
+    if state.unresolved_products:
+        return "clarify"
+    return "dispatch"
 
 
 def route_sql_validate(state: State) -> str:

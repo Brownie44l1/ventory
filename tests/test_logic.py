@@ -97,13 +97,28 @@ async def test_log_sale_insufficient_stock(db, trader_shop):
 
 
 @pytest.mark.asyncio
+async def test_restock_auto_creates_product(db, trader_shop):
+    trader, shop = trader_shop
+    result = await queries.log_restock(
+        db, shop.id, trader.id, "Sugar", Decimal("3"), cost=Decimal("5300")
+    )
+    assert result["product_name"] == "Sugar"
+    assert result["quantity_added"] == Decimal("3")
+    assert result["new_stock"] == Decimal("3")
+    
+    product = await queries.get_product_by_name(db, shop.id, "Sugar")
+    assert product is not None
+    assert product.current_stock == Decimal("3")
+
+
+@pytest.mark.asyncio
 async def test_restock_adds_stock(db, trader_shop):
     trader, shop = trader_shop
     await queries.create_product(
         db, shop.id, trader.id, "Garri", "bag", Decimal("10"), Decimal("5000")
     )
     result = await queries.log_restock(
-        db, shop.id, "Garri", Decimal("20"), cost=Decimal("40000")
+        db, shop.id, trader.id, "Garri", Decimal("20"), cost=Decimal("40000")
     )
     assert result["new_stock"] == Decimal("30")
     assert result["cost"] == Decimal("40000")

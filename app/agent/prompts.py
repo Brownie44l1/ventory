@@ -31,8 +31,11 @@ Owner said: "{question}"
 
 INTENT DEFINITIONS:
 - log_sale       → owner is recording a sale (e.g. "I sold 3 Pepsi", "customer bought rice")
-- restock        → owner is adding new stock (e.g. "I got 20 more Milo", "restock garri 50kg")
-- log_expense    → owner is recording a general expense (rent, fuel, transport, etc.)
+- restock        → owner is adding new stock (e.g. "I got 20 more Milo", "restock garri 50kg",
+                   "I bought 10 bags of rice at 150k", "bought 3 cartons of sugar for 5300")
+- log_expense    → owner is recording a general expense that is NOT buying stock for the shop
+                   (e.g. "paid 5k rent", "fuel 3k", "transport 2k", "electricity bill",
+                   "generator repair", "staff salary", "market tax")
 - log_debt       → customer took goods without paying (e.g. "Emeka collect rice, e no pay")
 - settle_debt    → customer paid back money they owed (e.g. "Emeka brought 3k")
 - get_inventory  → owner wants to see current stock levels

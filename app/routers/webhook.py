@@ -33,6 +33,23 @@ graph = build_graph()
 # Replace with Redis for multi-process / production deployments.
 session_store: dict[str, list] = {}
 
+# Fast-path: only unambiguously read-only phrases.
+_QUERY_KW = [
+    "how much", "how many", "summary", "profit",
+    "show me", "inventory",
+]
+
+# If any of these write-signal words appear, skip the fast-path
+# and let the LangGraph classifier decide — even if a query keyword matched.
+_WRITE_KW = [
+    "sell", "sold", "i sell", "i don sell",
+    "buy", "bought", "restock", "got more", "i get",
+    "pay", "paid", "no pay", "never pay",
+    "owe", "owed", "debt", "collect", "take",
+    "expense", "rent", "fuel", "transport",
+    "add product", "new product",
+]
+
 
 # ── WhatsApp verification ─────────────────────────────────────────────────────
 
@@ -108,20 +125,21 @@ async def _process(msg: dict, phone: str, msg_type: str):
                 return
 
             text = msg["text"]["body"]
+            text_lower = text.lower()
 
             # Export shortcut
-            if any(kw in text.lower() for kw in ["export", "download", "csv", "pdf"]):
-                fmt = "pdf" if "pdf" in text.lower() else "csv"
+            if any(kw in text_lower for kw in ["export", "download", "csv", "pdf"]):
+                fmt = "pdf" if "pdf" in text_lower else "csv"
                 await generate_and_send_export(phone, shop_id, fmt)
                 return
 
-            # Fast-path keyword queries → Gemini RAG (no agent overhead)
-            _QUERY_KW = [
-                "how much", "how many", "summary", "profit", "wetin i",
-                "show me", "inventory", "stock", "remain", "debt", "owe",
-                "pay", "customer", "switch", "business",
-            ]
-            if any(kw in text.lower() for kw in _QUERY_KW):
+            # Fast-path: read-only Gemini RAG — only when no write signals present.
+            # Write-intent messages (sales, restocks, debts, expenses) must always
+            # go to the LangGraph agent so they are actually stored in the database.
+            is_read_query = any(kw in text_lower for kw in _QUERY_KW)
+            has_write_signal = any(kw in text_lower for kw in _WRITE_KW)
+
+            if is_read_query and not has_write_signal:
                 inv_data  = await queries.get_inventory(db, shop_id)
                 debt_data = await queries.get_debts(db, shop_id)
                 summary   = await queries.get_shop_summary(db, shop_id)
@@ -155,17 +173,17 @@ async def _process(msg: dict, phone: str, msg_type: str):
             history = session_store.get(phone, [])
 
             result = await graph.ainvoke({
-                "messages":          [HumanMessage(content=text)],
-                "question":          text,
-                "history":           history,
-                "shop_id":           shop_id,
-                "trader_id":         trader_id,
-                "sql":               None,
-                "sql_result":        None,
-                "sql_validated":     False,
-                "retry_count":       0,
-                "sql_error":         None,
-                "resolved_products": {},
+                "messages":            [HumanMessage(content=text)],
+                "question":            text,
+                "history":             history,
+                "shop_id":             shop_id,
+                "trader_id":           trader_id,
+                "sql":                 None,
+                "sql_result":          None,
+                "sql_validated":       False,
+                "retry_count":         0,
+                "sql_error":           None,
+                "resolved_products":   {},
                 "unresolved_products": [],
                 "available_products":  [],
             })

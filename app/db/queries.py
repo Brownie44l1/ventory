@@ -179,7 +179,7 @@ async def log_sale(
             "quantity": quantity,
             "unit_price": product.unit_price,
             "line_total": line_total,
-            "remaining_stock": product.current_stock - quantity,
+            "remaining_stock": product.current_stock,
         })
 
     await db.commit()
@@ -195,15 +195,22 @@ async def log_sale(
 async def log_restock(
     db: AsyncSession,
     shop_id,
+    trader_id,
     product_name: str,
     quantity: Decimal,
     cost: Optional[Decimal] = None,
+    unit: str = "unit",
 ) -> dict:
-    product = await get_product_by_name(db, shop_id, product_name)
-    if not product:
-        raise ValueError(f"Product '{product_name}' not found. Add it first.")
     if quantity <= 0:
         raise ValueError("Quantity must be greater than 0.")
+
+    product = await get_product_by_name(db, shop_id, product_name)
+    if not product:
+        product = await create_product(
+            db, shop_id, trader_id,
+            name=product_name, unit=unit,
+            initial_stock=Decimal("0"), unit_price=Decimal("0"),
+        )
 
     db.add(RestockTransaction(
         shop_id=shop_id,
